@@ -1,5 +1,6 @@
 streamlit
-tensorflow
-pillow
-gdown
+pandas
 numpy
+scikit-learn
+joblib
+requests
