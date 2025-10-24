@@ -6,29 +6,49 @@ import requests
 import io
 
 # ----------------------------
-# 🔹 Load Model from Google Drive
+# 🔹 Google Drive Model File ID
 # ----------------------------
-# Example Google Drive link:
-# https://drive.google.com/file/d/1AbCdEfGh12345/view?usp=sharing
-# → File ID = 1AbCdEfGh12345
+FILE_ID = "13AqXvvCcmHNggKDitu-o1HBho12Mgl1N"
 
-FILE_ID = "1aSaewL3H6aW59yleryYrwAqu3FtzUfgb"
 @st.cache_resource
 def load_model_from_drive(file_id):
-    url = f"https://drive.google.com/uc?export=download&id={file_id}"
-    response = requests.get(url)
-    if response.status_code != 200:
-        st.error("❌ Failed to load model from Google Drive. Check file ID or access.")
-        return None
-    model = joblib.load(io.BytesIO(response.content))
-    return model
+    """
+    Load a .joblib model file directly from Google Drive.
+    This ONLY supports joblib (no pickle or gdown).
+    """
+    try:
+        # Build direct download link
+        url = f"https://drive.google.com/uc?export=download&id={file_id}"
+        response = requests.get(url, allow_redirects=True)
 
+        # Check if file was fetched correctly
+        if response.status_code != 200:
+            st.error(f"❌ Failed to fetch model from Drive (HTTP {response.status_code})")
+            return None
+
+        # Prevent loading HTML/invalid responses
+        start_bytes = response.content[:100].decode(errors="ignore").lower()
+        if "<html" in start_bytes:
+            st.error("⚠️ Invalid file — Google Drive returned an HTML page (not a .joblib binary).")
+            return None
+
+        # Load model directly from bytes
+        model = joblib.load(io.BytesIO(response.content))
+        return model
+
+    except Exception as e:
+        st.error(f"⚠️ Error loading model: {e}")
+        return None
+
+
+# Load model once
 ensemble_model = load_model_from_drive(FILE_ID)
-st.success("✅ Model loaded successfully from Google Drive!") if ensemble_model else None
+if ensemble_model:
+    st.success("✅ Model loaded successfully from Google Drive!")
 
 
 # ----------------------------
-# 🔹 UI Setup
+# 🔹 Streamlit UI
 # ----------------------------
 st.title("🌲 Forest Cover Type Prediction App")
 st.write("Enter the environmental parameters below to predict the forest cover type.")
@@ -48,7 +68,6 @@ Horizontal_Distance_To_Fire_Points = st.slider("Horizontal Distance to Fire Poin
 # Categorical Inputs
 Wilderness = st.selectbox("Wilderness Area", ["Unknown", "1", "2", "3", "4"])
 Soil = st.selectbox("Soil Type", ["Unknown"] + [str(i) for i in range(1, 41)])
-
 
 # ----------------------------
 # 🔹 Derived Features
@@ -86,6 +105,7 @@ data_dict = {
     "Elevation_Slope_Ratio": [Elevation_Slope_Ratio],
 }
 
+# Add categorical one-hots
 for i in range(4):
     data_dict[f"Wilderness_Area{i+1}"] = [Wilderness_bin[i]]
 for i in range(40):
@@ -94,7 +114,7 @@ for i in range(40):
 input_df = pd.DataFrame(data_dict)
 
 # ----------------------------
-# 🔹 Predict
+# 🔹 Predict Button
 # ----------------------------
 if st.button("Predict Forest Cover Type"):
     if ensemble_model is not None:
@@ -114,4 +134,3 @@ if st.button("Predict Forest Cover Type"):
             st.error(f"❌ Prediction failed: {e}")
     else:
         st.error("❌ Model not loaded. Please check your Google Drive File ID.")
-
