@@ -6,35 +6,25 @@ import gdown
 import os
 
 # ----------------------------
-# 🔹 Google Drive Model File ID
+# 🔹 Google Drive Model
 # ----------------------------
+# Replace this with your Google Drive file ID
 FILE_ID = "1aCfs_dgTmlyG8gtEHE2JlpkUoG4cuUhX"
 MODEL_PATH = "forest_cover_ensemble.joblib"
 
+# Download model if not exists
+if not os.path.exists(MODEL_PATH):
+    url = f"https://drive.google.com/uc?id={FILE_ID}"
+    st.info("⬇️ Downloading model from Google Drive...")
+    gdown.download(url, MODEL_PATH, quiet=False)
+    st.success("✅ Model downloaded successfully!")
+
+# Load model
 @st.cache_resource
-def load_model_from_drive(file_id, path):
-    """
-    Downloads a .joblib model from Google Drive using gdown if it doesn't exist locally,
-    then loads it with joblib.
-    """
-    try:
-        # Download only if file does not exist locally
-        if not os.path.exists(path):
-            url = f"https://drive.google.com/uc?id={file_id}"
-            st.info("⬇️ Downloading model from Google Drive...")
-            gdown.download(url, path, quiet=False)
+def load_model(path):
+    return joblib.load(path)
 
-        # Load the model
-        model = joblib.load(path)
-        return model
-    except Exception as e:
-        st.error(f"⚠️ Failed to load model: {e}")
-        return None
-
-# Load model once
-ensemble_model = load_model_from_drive(FILE_ID, MODEL_PATH)
-if ensemble_model:
-    st.success("✅ Model loaded successfully from Google Drive!")
+ensemble_model = load_model(MODEL_PATH)
 
 # ----------------------------
 # 🔹 Streamlit UI
@@ -66,12 +56,11 @@ Road_Fire_Diff = abs(Horizontal_Distance_To_Roadways - Horizontal_Distance_To_Fi
 Hydro_Road_Diff = abs(Horizontal_Distance_To_Hydrology - Horizontal_Distance_To_Roadways)
 Elevation_Slope_Ratio = Elevation / (Slope + 1)
 
-# Wilderness One-Hot
+# One-Hot Encoding
 Wilderness_bin = [0]*4
 if Wilderness != "Unknown":
     Wilderness_bin[int(Wilderness)-1] = 1
 
-# Soil One-Hot
 Soil_bin = [0]*40
 if Soil != "Unknown":
     Soil_bin[int(Soil)-1] = 1
@@ -88,38 +77,48 @@ data_dict = {
     "Hillshade_Noon": [Hillshade_Noon],
     "Hillshade_3pm": [Hillshade_3pm],
     "Horizontal_Distance_To_Fire_Points": [Horizontal_Distance_To_Fire_Points],
-    "Mean_Hillshade": [Mean_Hillshade],
-    "Road_Fire_Diff": [Road_Fire_Diff],
-    "Hydro_Road_Diff": [Hydro_Road_Diff],
-    "Elevation_Slope_Ratio": [Elevation_Slope_Ratio],
 }
 
-# Add categorical one-hot features
 for i in range(4):
     data_dict[f"Wilderness_Area{i+1}"] = [Wilderness_bin[i]]
 for i in range(40):
     data_dict[f"Soil_Type{i+1}"] = [Soil_bin[i]]
 
+# Derived features
+data_dict["Mean_Hillshade"] = [Mean_Hillshade]
+data_dict["Road_Fire_Diff"] = [Road_Fire_Diff]
+data_dict["Hydro_Road_Diff"] = [Hydro_Road_Diff]
+data_dict["Elevation_Slope_Ratio"] = [Elevation_Slope_Ratio]
+
+# Correct feature order (must match training)
+feature_order = [
+    "Elevation", "Aspect", "Slope",
+    "Horizontal_Distance_To_Hydrology", "Vertical_Distance_To_Hydrology",
+    "Horizontal_Distance_To_Roadways", "Hillshade_9am", "Hillshade_Noon",
+    "Hillshade_3pm", "Horizontal_Distance_To_Fire_Points",
+    "Wilderness_Area1", "Wilderness_Area2", "Wilderness_Area3", "Wilderness_Area4",
+] + [f"Soil_Type{i}" for i in range(1, 41)] + [
+    "Mean_Hillshade", "Road_Fire_Diff", "Hydro_Road_Diff", "Elevation_Slope_Ratio"
+]
+
 input_df = pd.DataFrame(data_dict)
+input_df = input_df[feature_order]
 
 # ----------------------------
 # 🔹 Predict Button
 # ----------------------------
 if st.button("Predict Forest Cover Type"):
-    if ensemble_model is not None:
-        try:
-            prediction = ensemble_model.predict(input_df)[0]
-            cover_mapping = {
-                1: "Spruce/Fir",
-                2: "Lodgepole Pine",
-                3: "Ponderosa Pine",
-                4: "Cottonwood/Willow",
-                5: "Aspen",
-                6: "Douglas-fir",
-                7: "Krummholz"
-            }
-            st.success(f"🌲 Predicted Forest Cover Type: **{prediction} - {cover_mapping[int(prediction)]}**")
-        except Exception as e:
-            st.error(f"❌ Prediction failed: {e}")
-    else:
-        st.error("❌ Model not loaded. Please check your Google Drive File ID.")
+    try:
+        prediction = ensemble_model.predict(input_df)[0]
+        cover_mapping = {
+            1: "Spruce/Fir",
+            2: "Lodgepole Pine",
+            3: "Ponderosa Pine",
+            4: "Cottonwood/Willow",
+            5: "Aspen",
+            6: "Douglas-fir",
+            7: "Krummholz"
+        }
+        st.success(f"🌲 Predicted Forest Cover Type: **{prediction} - {cover_mapping[int(prediction)]}**")
+    except Exception as e:
+        st.error(f"❌ Prediction failed: {e}")
