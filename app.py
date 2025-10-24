@@ -2,24 +2,39 @@ import streamlit as st
 import pandas as pd
 import numpy as np
 import joblib
+import gdown
+import os
 
 # ----------------------------
-# 🔹 Load Model Locally
+# 🔹 Google Drive Model File ID
 # ----------------------------
-MODEL_PATH = "forest_cover_ensemble.joblib"  # Make sure this file is in the same folder as app.py
+FILE_ID = "1aCfs_dgTmlyG8gtEHE2JlpkUoG4cuUhX"
+MODEL_PATH = "forest_cover_ensemble.joblib"
 
 @st.cache_resource
-def load_model(path):
+def load_model_from_drive(file_id, path):
+    """
+    Downloads a .joblib model from Google Drive using gdown if it doesn't exist locally,
+    then loads it with joblib.
+    """
     try:
+        # Download only if file does not exist locally
+        if not os.path.exists(path):
+            url = f"https://drive.google.com/uc?id={file_id}"
+            st.info("⬇️ Downloading model from Google Drive...")
+            gdown.download(url, path, quiet=False)
+
+        # Load the model
         model = joblib.load(path)
         return model
     except Exception as e:
-        st.error(f"⚠️ Error loading model: {e}")
+        st.error(f"⚠️ Failed to load model: {e}")
         return None
 
-ensemble_model = load_model(MODEL_PATH)
+# Load model once
+ensemble_model = load_model_from_drive(FILE_ID, MODEL_PATH)
 if ensemble_model:
-    st.success("✅ Model loaded successfully!")
+    st.success("✅ Model loaded successfully from Google Drive!")
 
 # ----------------------------
 # 🔹 Streamlit UI
@@ -107,4 +122,4 @@ if st.button("Predict Forest Cover Type"):
         except Exception as e:
             st.error(f"❌ Prediction failed: {e}")
     else:
-        st.error("❌ Model not loaded. Make sure 'forest_cover_ensemble.joblib' exists in the app folder.")
+        st.error("❌ Model not loaded. Please check your Google Drive File ID.")
