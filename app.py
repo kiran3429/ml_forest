@@ -8,7 +8,7 @@ import io
 # ----------------------------
 # 🔹 Google Drive Model File ID
 # ----------------------------
-FILE_ID = "1HkLu-Di_y947BD0p24spopgsCSd0RRts"
+FILE_ID = "1aCfs_dgTmlyG8gtEHE2JlpkUoG4cuUhX"
 @st.cache_resource
 def load_model_from_drive(file_id):
     """
