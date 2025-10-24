@@ -6,3 +6,4 @@ joblib
 requests
 gdown
 xgboost
+lightgbm
