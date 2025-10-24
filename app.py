@@ -12,7 +12,7 @@ import io
 # https://drive.google.com/file/d/1AbCdEfGh12345/view?usp=sharing
 # → File ID = 1AbCdEfGh12345
 
-FILE_ID = "13AqXvvCcmHNggKDitu-o1HBho12Mgl1N"
+FILE_ID = "1aSaewL3H6aW59yleryYrwAqu3FtzUfgb"
 @st.cache_resource
 def load_model_from_drive(file_id):
     url = f"https://drive.google.com/uc?export=download&id={file_id}"
