@@ -2,49 +2,24 @@ import streamlit as st
 import pandas as pd
 import numpy as np
 import joblib
-import requests
-import io
 
 # ----------------------------
-# 🔹 Google Drive Model File ID
+# 🔹 Load Model Locally
 # ----------------------------
-FILE_ID = "1aCfs_dgTmlyG8gtEHE2JlpkUoG4cuUhX"
+MODEL_PATH = "forest_cover_ensemble.joblib"  # Make sure this file is in the same folder as app.py
+
 @st.cache_resource
-def load_model_from_drive(file_id):
-    """
-    Load a .joblib model file directly from Google Drive.
-    This ONLY supports joblib (no pickle or gdown).
-    """
+def load_model(path):
     try:
-        # Build direct download link
-        url = f"https://drive.google.com/uc?export=download&id={file_id}"
-        response = requests.get(url, allow_redirects=True)
-
-        # Check if file was fetched correctly
-        if response.status_code != 200:
-            st.error(f"❌ Failed to fetch model from Drive (HTTP {response.status_code})")
-            return None
-
-        # Prevent loading HTML/invalid responses
-        start_bytes = response.content[:100].decode(errors="ignore").lower()
-        if "<html" in start_bytes:
-            st.error("⚠️ Invalid file — Google Drive returned an HTML page (not a .joblib binary).")
-            return None
-
-        # Load model directly from bytes
-        model = joblib.load(io.BytesIO(response.content))
+        model = joblib.load(path)
         return model
-
     except Exception as e:
         st.error(f"⚠️ Error loading model: {e}")
         return None
 
-
-# Load model once
-ensemble_model = load_model_from_drive(FILE_ID)
+ensemble_model = load_model(MODEL_PATH)
 if ensemble_model:
-    st.success("✅ Model loaded successfully from Google Drive!")
-
+    st.success("✅ Model loaded successfully!")
 
 # ----------------------------
 # 🔹 Streamlit UI
@@ -104,7 +79,7 @@ data_dict = {
     "Elevation_Slope_Ratio": [Elevation_Slope_Ratio],
 }
 
-# Add categorical one-hots
+# Add categorical one-hot features
 for i in range(4):
     data_dict[f"Wilderness_Area{i+1}"] = [Wilderness_bin[i]]
 for i in range(40):
@@ -132,4 +107,4 @@ if st.button("Predict Forest Cover Type"):
         except Exception as e:
             st.error(f"❌ Prediction failed: {e}")
     else:
-        st.error("❌ Model not loaded. Please check your Google Drive File ID.")
+        st.error("❌ Model not loaded. Make sure 'forest_cover_ensemble.joblib' exists in the app folder.")
