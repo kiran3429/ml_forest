@@ -9,7 +9,6 @@ import io
 # 🔹 Google Drive Model File ID
 # ----------------------------
 FILE_ID = "13AqXvvCcmHNggKDitu-o1HBho12Mgl1N"
-
 @st.cache_resource
 def load_model_from_drive(file_id):
     """
