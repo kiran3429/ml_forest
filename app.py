@@ -6,32 +6,58 @@ import requests
 import io
 
 # ----------------------------
-# 🔹 Load Model from Google Drive
+# 🔹 Load Model from Google Drive (Safe Method)
 # ----------------------------
-# Example Google Drive link:
-# https://drive.google.com/file/d/1AbCdEfGh12345/view?usp=sharing
+# Example link: https://drive.google.com/file/d/1AbCdEfGh12345/view?usp=sharing
 # → File ID = 1AbCdEfGh12345
 
 FILE_ID = "13AqXvvCcmHNggKDitu-o1HBho12Mgl1N"
+
+def get_confirm_token(response):
+    """Extract confirmation token for large Drive files."""
+    for key, value in response.cookies.items():
+        if key.startswith('download_warning'):
+            return value
+    return None
+
+
 @st.cache_resource
 def load_model_from_drive(file_id):
-    url = f"https://drive.google.com/uc?export=download&id={file_id}"
-    response = requests.get(url)
+    """Reliable Google Drive file loader for joblib models."""
+    base_url = "https://drive.google.com/uc?export=download"
+    session = requests.Session()
+    response = session.get(base_url, params={'id': file_id}, stream=True)
+    token = get_confirm_token(response)
+
+    if token:
+        params = {'id': file_id, 'confirm': token}
+        response = session.get(base_url, params=params, stream=True)
+
     if response.status_code != 200:
-        st.error("❌ Failed to load model from Google Drive. Check file ID or access.")
+        st.error("❌ Failed to download model from Google Drive. Check file ID or permissions.")
         return None
-    model = joblib.load(io.BytesIO(response.content))
-    return model
+
+    model_bytes = io.BytesIO(response.content)
+    try:
+        model = joblib.load(model_bytes)
+        return model
+    except Exception as e:
+        st.error(f"⚠️ Error loading model: {e}")
+        return None
+
 
 ensemble_model = load_model_from_drive(FILE_ID)
-st.success("✅ Model loaded successfully from Google Drive!") if ensemble_model else None
+if ensemble_model:
+    st.success("✅ Model loaded successfully from Google Drive!")
+else:
+    st.stop()
 
 
 # ----------------------------
 # 🔹 UI Setup
 # ----------------------------
 st.title("🌲 Forest Cover Type Prediction App")
-st.write("Enter the environmental parameters below to predict the forest cover type.")
+st.write("Enter environmental parameters below to predict the forest cover type.")
 
 # Numeric Inputs
 Elevation = st.slider("Elevation (m)", 2000, 4000, 2600)
@@ -94,24 +120,20 @@ for i in range(40):
 input_df = pd.DataFrame(data_dict)
 
 # ----------------------------
-# 🔹 Predict
+# 🔹 Prediction
 # ----------------------------
 if st.button("Predict Forest Cover Type"):
-    if ensemble_model is not None:
-        try:
-            prediction = ensemble_model.predict(input_df)[0]
-            cover_mapping = {
-                1: "Spruce/Fir",
-                2: "Lodgepole Pine",
-                3: "Ponderosa Pine",
-                4: "Cottonwood/Willow",
-                5: "Aspen",
-                6: "Douglas-fir",
-                7: "Krummholz"
-            }
-            st.success(f"🌲 Predicted Forest Cover Type: **{prediction} - {cover_mapping[int(prediction)]}**")
-        except Exception as e:
-            st.error(f"❌ Prediction failed: {e}")
-    else:
-        st.error("❌ Model not loaded. Please check your Google Drive File ID.")
-
+    try:
+        prediction = ensemble_model.predict(input_df)[0]
+        cover_mapping = {
+            1: "Spruce/Fir",
+            2: "Lodgepole Pine",
+            3: "Ponderosa Pine",
+            4: "Cottonwood/Willow",
+            5: "Aspen",
+            6: "Douglas-fir",
+            7: "Krummholz"
+        }
+        st.success(f"🌳 Predicted Forest Cover Type: **{prediction} - {cover_mapping[int(prediction)]}**")
+    except Exception as e:
+        st.error(f"❌ Prediction failed: {e}")
